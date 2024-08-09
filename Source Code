@@ -1,0 +1,94 @@
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+#include "I2Cdev.h"
+#include "MPU6050.h"
+#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+#include "Wire.h"
+#endif
+MPU6050 accelgyro;
+
+
+int16_t ax,ay,az;
+
+
+
+#define OUTPUT_READABLE_ACCELGYRO
+static const uint32_t GPSBaud = 9600;
+TinyGPSPlus gps;
+//tx,rx
+SoftwareSerial ss(3, 4);
+//tx,rx
+SoftwareSerial SIM900(8, 7);//pin 7 of arduino to tx of gsm and pin 8 nof arduino to rx of gsm
+boolean activate;
+void setup() {
+ 
+  Serial.begin(9600);
+  ss.begin(9600);
+    Wire.begin();
+  accelgyro.initialize();
+  accelgyro.testConnection() ? Serial.println("MPU6050 connection successful") : Serial.println("MPU6050 connection failed");
+
+  
+  Serial.println("Setup complete.");
+}
+void loop() {
+
+if (ss.available() > 0){
+    if(gps.encode(ss.read())){
+    if (gps.location.isValid()){
+      Serial.print(F("Location: "));
+      Serial.print("GPS FIXED");
+      Serial.print("Latitude= "); 
+      Serial.print(gps.location.lat(), 6);
+      Serial.print(" Longitude= "); 
+      Serial.println(gps.location.lng(), 6);
+      Serial.print("Google Maps URL: ");
+      Serial.println("http://maps.google.com/maps?&z=15&mrt=yp&t=k&q=" + String(gps.location.lat(), 6) + "," + String(gps.location.lng(), 6));
+      delay(3000);
+      acceleration();
+      ss.listen();}}}
+if(ax>940||ax<-940){
+      SIM900.begin(9600);
+      Serial.print("SIM900 ready...");
+      SIM900.println("AT+CMGF=1"); 
+      delay(1000);
+      delay(100);
+      SIM900.println("AT+CMGS=\"+919353235772\"\r");
+      delay(1000);
+      Serial.println("Sending SMS");
+      SIM900.println("A CRASH of vechicle has been detected, please try to contact the driver");
+      delay(100);
+      SIM900.println("http://maps.google.com/maps/place/" + String(gps.location.lat(), 6)+String(",") + String(gps.location.lng(), 6));
+      delay(100);
+      SIM900.write(26); 
+      delay(100);
+      SIM900.println();
+      delay(5000);
+      SIM900.println("ATDphone number;"); 
+      delay(10000); 
+      SIM900.println("ATH"); 
+      delay(1000000);}}
+
+
+void acceleration(){
+  while(1){    
+
+    accelgyro.getAcceleration(&ax, &ay, &az);
+
+    ax = ((float)(ax ) / 16384.0) * 9.81 * 100.0;
+    ay = ((float)(ay ) / 16384.0) * 9.81 * 100.0;
+    az = ((float)(az ) / 16384.0) * 9.81 * 100.0;
+
+    Serial.print("Accel X: ");
+    Serial.print(ax);
+    Serial.println(" cm/s²");
+     Serial.print("\nAccel y: ");
+    Serial.print(ay);
+    Serial.println(" cm/s²");
+     Serial.print("\nAccel z: ");
+    Serial.print(az);
+    Serial.println(" cm/s²");
+    
+  
+    delay(2000);
+    if(ax>940||ax<-940){break;}}
